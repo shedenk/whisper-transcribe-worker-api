@@ -6,8 +6,8 @@ services:
     container_name: transcribe-redis
     command: ["redis-server", "--requirepass", "your-redis-password"]
     restart: unless-stopped
-    networks: [internal-net]
-
+    networks: 
+    - internal-net
   api:
     build: ./api
     container_name: transcribe-api
@@ -23,9 +23,11 @@ services:
 
     volumes:
       - transcribe-data:/data
-    depends_on: [redis]
+    depends_on: 
+    - redis
     restart: unless-stopped
-    networks: [internal-net]
+    networks: 
+        - internal-net
 
   worker:
     build: ./worker
@@ -37,13 +39,15 @@ services:
       MODEL_SIZE: small
       DEVICE: cpu
       COMPUTE_TYPE: int8
-      MAX_CONCURRENCY: "1"     # worker CPU 6 core: mulai 1 dulu, naikkan jika aman
+      MAX_CONCURRENCY: "2"     # worker CPU 6 core: mulai 1 dulu, naikkan jika aman
       JOB_TTL_SECONDS: "86400"
     volumes:
       - transcribe-data:/data
-    depends_on: [redis]
+    depends_on: 
+      - redis
     restart: unless-stopped
-    networks: [internal-net]
+    networks: 
+        - internal-net
 
 networks:
   internal-net:
