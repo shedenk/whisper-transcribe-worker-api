@@ -3,7 +3,7 @@ import uuid
 from pathlib import Path
 from typing import Optional, Literal
 
-from fastapi import FastAPI, UploadFile, File, Body, HTTPException
+from fastapi import FastAPI, UploadFile, File, Body, HTTPException, Request
 from fastapi.responses import FileResponse
 import httpx
 
@@ -11,36 +11,60 @@ from rq.job import Job
 from redis_queue import get_queue, get_redis
 from utils import storage_dir, safe_job_id
 
-app = FastAPI(title="Transcribe to SRT API")
+from pydantic import BaseModel
 
-# ---- request schemas (simple) ----
-# mode: url or upload
+class TranscribeRequest(BaseModel):
+    source_type: Literal["url", "upload"]
+    url: Optional[str] = None
+    language: Optional[str] = None
+    task: Literal["transcribe", "translate"] = "transcribe"
+    output: Literal["srt", "vtt", "txt"] = "srt"
+    diarize: bool = False
+
 @app.post("/v1/transcribe")
 async def create_job(
-    source_type: Literal["url", "upload"] = Body(...),
-    url: Optional[str] = Body(None),
-    language: Optional[str] = Body(None),          # e.g. "id" / "en"
-    task: Literal["transcribe", "translate"] = Body("transcribe"),
-    output: Literal["srt", "vtt", "txt"] = Body("srt"),
-    diarize: bool = Body(False),                   # placeholder; belum diaktifkan di worker
-    file: UploadFile | None = File(None),
+    request: Request,
+    file: Optional[UploadFile] = File(None)
 ):
+    content_type = request.headers.get("Content-Type", "")
+    
+    if "application/json" in content_type:
+        try:
+            data = await request.json()
+            params = TranscribeRequest(**data)
+        except Exception as e:
+            raise HTTPException(422, detail=f"Invalid JSON: {str(e)}")
+    else:
+        # Assume multipart/form-data or similar
+        try:
+            form = await request.form()
+            params = TranscribeRequest(
+                source_type=form.get("source_type"),
+                url=form.get("url"),
+                language=form.get("language"),
+                task=form.get("task", "transcribe"),
+                output=form.get("output", "srt"),
+                diarize=form.get("diarize", "false").lower() == "true"
+            )
+        except Exception as e:
+            raise HTTPException(422, detail=f"Invalid Form Data: {str(e)}")
+
     job_uuid = safe_job_id(str(uuid.uuid4()))
     base = storage_dir() / "jobs" / job_uuid
     base.mkdir(parents=True, exist_ok=True)
 
     input_path = base / "input.bin"
 
-    if source_type == "url":
-        if not url:
+    if params.source_type == "url":
+        if not params.url:
             raise HTTPException(400, "url wajib diisi untuk source_type=url")
         # download file
         async with httpx.AsyncClient(follow_redirects=True, timeout=600) as client:
-            r = await client.get(url)
+            r = await client.get(params.url)
             r.raise_for_status()
             input_path.write_bytes(r.content)
 
-    elif source_type == "upload":
+    elif params.source_type == "upload":
         if file is None:
             raise HTTPException(400, "file wajib diupload untuk source_type=upload")
         content = await file.read()
@@ -51,10 +75,10 @@ async def create_job(
     payload = {
         "job_id": job_uuid,
         "input_path": str(input_path),
-        "language": language,
-        "task": task,
-        "output": output,
-        "diarize": diarize,
+        "language": params.language,
+        "task": params.task,
+        "output": params.output,
+        "diarize": params.diarize,
     }
 
     q = get_queue()
