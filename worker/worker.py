@@ -2,8 +2,7 @@ import os
 import subprocess
 from pathlib import Path
 from typing import Dict, Any, Optional
-
-from rq import Worker, Queue, Connection, get_current_job
+from rq import Worker, Queue, get_current_job
 from faster_whisper import WhisperModel
 import srt
 from redis_queue import get_redis
@@ -127,7 +126,6 @@ def process_job(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 if __name__ == "__main__":
     redis_conn = get_redis()
-    with Connection(redis_conn):
-        q = Queue("transcribe")
-        w = Worker([q])
-        w.work()
+    q = Queue("transcribe", connection=redis_conn)
+    w = Worker([q], connection=redis_conn)
+    w.work()
