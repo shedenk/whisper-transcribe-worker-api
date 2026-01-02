@@ -4,7 +4,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: transcribe-redis
-  command: ["redis-server", "--requirepass", "your-redis-password"]
+    command: ["redis-server", "--requirepass", "your-redis-password"]
     restart: unless-stopped
     networks: [internal-net]
 
