@@ -90,7 +90,7 @@ async def create_job(
         worker.process_job,
         payload,
         job_id=job_uuid,
-        job_timeout=int(os.getenv("JOB_TIMEOUT", "3600")),
+        job_timeout=int(os.getenv("JOB_TIMEOUT", "14400")),
         result_ttl=int(os.getenv("JOB_TTL_SECONDS", "86400"))
     )
     print(f"[+] Job enqueued: {job_uuid}")
