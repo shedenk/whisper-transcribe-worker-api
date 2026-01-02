@@ -1,0 +1,54 @@
+version: "3.9"
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: transcribe-redis
+    command: ["redis-server", "--appendonly", "no"]
+    restart: unless-stopped
+    networks: [internal-net]
+
+  api:
+    build: ./api
+    container_name: transcribe-api
+    environment:
+      TZ: Asia/Jakarta
+      REDIS_URL: redis://redis:6379/0
+      STORAGE_DIR: /data
+      MODEL_SIZE: small        # tiny | base | small | medium | large-v3
+      DEVICE: cpu              # cpu | cuda (kalau ada GPU)
+      COMPUTE_TYPE: int8       # cpu: int8 / int8_float16; gpu: float16
+      MAX_CONCURRENCY: "2"
+      JOB_TTL_SECONDS: "86400"
+    ports:
+      - "8099:8099"
+    volumes:
+      - transcribe-data:/data
+    depends_on: [redis]
+    restart: unless-stopped
+    networks: [internal-net]
+
+  worker:
+    build: ./worker
+    container_name: transcribe-worker
+    environment:
+      TZ: Asia/Jakarta
+      REDIS_URL: redis://redis:6379/0
+      STORAGE_DIR: /data
+      MODEL_SIZE: small
+      DEVICE: cpu
+      COMPUTE_TYPE: int8
+      MAX_CONCURRENCY: "1"     # worker CPU 6 core: mulai 1 dulu, naikkan jika aman
+      JOB_TTL_SECONDS: "86400"
+    volumes:
+      - transcribe-data:/data
+    depends_on: [redis]
+    restart: unless-stopped
+    networks: [internal-net]
+
+networks:
+  internal-net:
+    external: true
+
+volumes:
+  transcribe-data:

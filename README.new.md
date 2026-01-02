@@ -39,8 +39,7 @@ The API will be available at `http://localhost:8099`.
 
 Submit a media URL or upload a file for transcription.
 
-**Request Body:**
-
+**Request Body (JSON for URL):**
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `source_type` | string | Yes | `url` or `upload` |
@@ -50,7 +49,7 @@ Submit a media URL or upload a file for transcription.
 | `task` | string | No | `transcribe` (default) or `translate` (to English) |
 | `output` | string | No | `srt` (default), `vtt`, or `txt` |
 
-**Example (URL - JSON):**
+**Example (URL):**
 ```bash
 curl -X POST http://localhost:8099/v1/transcribe \
   -H "Content-Type: application/json" \
@@ -61,7 +60,7 @@ curl -X POST http://localhost:8099/v1/transcribe \
   }'
 ```
 
-**Example (Upload - Form Data):**
+**Example (Upload):**
 ```bash
 curl -X POST http://localhost:8099/v1/transcribe \
   -F "source_type=upload" \
@@ -73,8 +72,8 @@ curl -X POST http://localhost:8099/v1/transcribe \
 ```json
 {
   "job_id": "550e8400-e29b-41d4-a716-446655440000",
-  "status_url": f"/v1/jobs/550e8400-e29b-41d4-a716-446655440000",
-  "result_url": f"/v1/jobs/550e8400-e29b-41d4-a716-446655440000/result"
+  "status_url": "/v1/jobs/550e8400-e29b-41d4-a716-446655440000",
+  "result_url": "/v1/jobs/550e8400-e29b-41d4-a716-446655440000/result"
 }
 ```
 
