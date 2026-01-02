@@ -32,6 +32,9 @@ docker-compose up -d
 
 The API will be available at `http://localhost:8099`.
 
+> [!TIP]
+> Use `http://localhost:8099` for access from your host machine. Use `http://transcribe-api:8099` only for communication between containers on the same Docker network.
+
 ## 📡 API Reference
 
 ### 1. Create Transcription Job
