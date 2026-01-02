@@ -109,7 +109,9 @@ async def job_status(job_id: str):
     for i in range(3):
         try:
             job = Job.fetch(job_id, connection=redis)
-            if job: break
+            if job:
+                job.refresh() # Ensure we have the latest meta
+                break
         except:
             import asyncio
             if i < 2: await asyncio.sleep(0.5)
@@ -154,6 +156,7 @@ async def job_result(job_id: str):
         try:
             job = Job.fetch(job_id, connection=redis)
             if job:
+                job.refresh()
                 break
         except:
             if i < 2:
