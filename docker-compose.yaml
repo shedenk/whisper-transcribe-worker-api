@@ -8,7 +8,7 @@ services:
     restart: unless-stopped
     networks: 
     - internal-net
-  api:
+  transcribe-api:
     build: .
     container_name: transcribe-api
     environment:
@@ -30,7 +30,7 @@ services:
     networks: 
         - internal-net
 
-  worker:
+  transcribe-worker:
     build: .
     container_name: transcribe-worker
     environment:

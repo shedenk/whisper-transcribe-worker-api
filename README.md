@@ -34,7 +34,7 @@ The API is available internally to other Docker containers.
 
 > [!IMPORTANT]
 > **INTERNAL ACCESS ONLY:**
-> Access the API at `http://transcribe-api:8099` from other containers in the same network (e.g., n8n). External access via `localhost` is disabled for security.
+> Access the API at `http://transcribe-api:8080` from other containers in the same network (e.g., n8n). External access via `localhost` is disabled for security.
 
 ## 📡 API Reference
 
@@ -43,7 +43,7 @@ The API is available internally to other Docker containers.
 
 Submit a media URL or upload a file for transcription.
 
-**Internal URL:** `http://transcribe-api:8099/v1/transcribe`
+**Internal URL:** `http://transcribe-api:8080/v1/transcribe`
 
 **Request Body:**
 
@@ -58,7 +58,7 @@ Submit a media URL or upload a file for transcription.
 
 **Example (URL - JSON):**
 ```bash
-curl -X POST http://transcribe-api:8099/v1/transcribe \
+curl -X POST http://transcribe-api:8080/v1/transcribe \
   -H "Content-Type: application/json" \
   -d '{
     "source_type": "url",
@@ -69,7 +69,7 @@ curl -X POST http://transcribe-api:8099/v1/transcribe \
 
 **Example (Upload - Form Data):**
 ```bash
-curl -X POST http://transcribe-api:8099/v1/transcribe \
+curl -X POST http://transcribe-api:8080/v1/transcribe \
   -F "source_type=upload" \
   -F "file=@/path/to/audio.mp3" \
   -F "output=srt"
@@ -116,6 +116,7 @@ Environment variables in `docker-compose.yaml`:
 
 | Variable | Default | Description |
 |---|---|---|
+| `ROLE` | `api` | Container role: `api` (starts FastAPI) or `worker` (starts RQ worker) |
 | `MODEL_SIZE` | `small` | Whisper model size (`tiny`, `base`, `small`, `medium`, `large-v3`) |
 | `DEVICE` | `cpu` | Processing device (`cpu` or `cuda`) |
 | `COMPUTE_TYPE` | `int8` | Quantization (`int8`, `float16`, etc.) |
