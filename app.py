@@ -28,6 +28,7 @@ async def create_job(
     request: Request,
     file: Optional[UploadFile] = File(None)
 ):
+    print(f"[*] Received transcription request")
     content_type = request.headers.get("Content-Type", "")
     
     if "application/json" in content_type:
@@ -85,6 +86,7 @@ async def create_job(
 
     q = get_queue()
     rq_job = q.enqueue("worker.process_job", payload, job_id=job_uuid, result_ttl=int(os.getenv("JOB_TTL_SECONDS","86400")))
+    print(f"[+] Job enqueued: {job_uuid}")
     return {
         "job_id": rq_job.id,
         "status_url": f"/v1/jobs/{rq_job.id}",

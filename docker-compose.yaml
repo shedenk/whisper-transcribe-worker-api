@@ -18,6 +18,7 @@ services:
     environment:
       TZ: Asia/Jakarta
       ROLE: api
+      PYTHONUNBUFFERED: "1"
       REDIS_URL: redis://:your-redis-password@redis:6379/0
       STORAGE_DIR: /data
       MODEL_SIZE: small        # tiny | base | small | medium | large-v3
@@ -40,6 +41,7 @@ services:
     environment:
       TZ: Asia/Jakarta
       ROLE: worker
+      PYTHONUNBUFFERED: "1"
       REDIS_URL: redis://:your-redis-password@redis:6379/0
       STORAGE_DIR: /data
       MODEL_SIZE: small

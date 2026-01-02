@@ -72,6 +72,7 @@ def process_job(payload: Dict[str, Any]) -> Dict[str, Any]:
     job.save_meta()
 
     job_id = payload["job_id"]
+    print(f"[#] Starting job: {job_id}")
     input_path = payload["input_path"]
     language = payload.get("language")  # "id" etc.
     task = payload.get("task", "transcribe")
@@ -81,18 +82,21 @@ def process_job(payload: Dict[str, Any]) -> Dict[str, Any]:
     base.mkdir(parents=True, exist_ok=True)
 
     wav_path = str(base / "audio.wav")
+    print(f"    - Converting to WAV...")
     _to_wav(input_path, wav_path)
 
     job.meta["progress"] = 10
     job.meta["message"] = "loading model"
     job.save_meta()
 
+    print(f"    - Loading model ({MODEL_SIZE})...")
     model = _get_model()
 
     job.meta["progress"] = 15
     job.meta["message"] = "transcribing"
     job.save_meta()
 
+    print(f"    - Transcribing...")
     segments, info = model.transcribe(
         wav_path,
         language=language,
@@ -100,12 +104,14 @@ def process_job(payload: Dict[str, Any]) -> Dict[str, Any]:
         vad_filter=True,
         beam_size=1,
     )
+    print(f"      [Detected language: {info.language}]")
     segments = list(segments)
 
     job.meta["progress"] = 90
     job.meta["message"] = "writing output"
     job.save_meta()
 
+    print(f"    - Writing {output} output...")
     if output == "srt":
         _write_srt(segments, base / "output.srt")
     elif output == "vtt":
@@ -116,6 +122,7 @@ def process_job(payload: Dict[str, Any]) -> Dict[str, Any]:
     job.meta["progress"] = 100
     job.meta["message"] = "done"
     job.save_meta()
+    print(f"[+] Job {job_id} completed successfully.")
 
     return {
         "job_id": job_id,
