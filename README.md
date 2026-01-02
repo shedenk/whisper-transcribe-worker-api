@@ -30,10 +30,11 @@ cd whisper-transcribe-worker-api
 docker-compose up -d
 ```
 
-The API will be available at `http://localhost:8099`.
+The API is available internally to other Docker containers.
 
-> [!TIP]
-> Use `http://localhost:8099` for access from your host machine. Use `http://transcribe-api:8099` only for communication between containers on the same Docker network.
+> [!IMPORTANT]
+> **INTERNAL ACCESS ONLY:**
+> Access the API at `http://transcribe-api:8099` from other containers in the same network (e.g., n8n). External access via `localhost` is disabled for security.
 
 ## 📡 API Reference
 
@@ -41,6 +42,8 @@ The API will be available at `http://localhost:8099`.
 `POST /v1/transcribe`
 
 Submit a media URL or upload a file for transcription.
+
+**Internal URL:** `http://transcribe-api:8099/v1/transcribe`
 
 **Request Body:**
 
@@ -55,7 +58,7 @@ Submit a media URL or upload a file for transcription.
 
 **Example (URL - JSON):**
 ```bash
-curl -X POST http://localhost:8099/v1/transcribe \
+curl -X POST http://transcribe-api:8099/v1/transcribe \
   -H "Content-Type: application/json" \
   -d '{
     "source_type": "url",
@@ -66,7 +69,7 @@ curl -X POST http://localhost:8099/v1/transcribe \
 
 **Example (Upload - Form Data):**
 ```bash
-curl -X POST http://localhost:8099/v1/transcribe \
+curl -X POST http://transcribe-api:8099/v1/transcribe \
   -F "source_type=upload" \
   -F "file=@/path/to/audio.mp3" \
   -F "output=srt"
