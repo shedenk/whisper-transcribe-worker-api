@@ -6,3 +6,5 @@ rq==2.0.0
 python-multipart==0.0.20
 httpx==0.28.1
 requests
+faster-whisper==1.1.0
+srt==3.5.3

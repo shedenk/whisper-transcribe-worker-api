@@ -9,10 +9,11 @@ services:
     networks: 
     - internal-net
   api:
-    build: ./api
+    build: .
     container_name: transcribe-api
     environment:
       TZ: Asia/Jakarta
+      ROLE: api
       REDIS_URL: redis://:your-redis-password@redis:6379/0
       STORAGE_DIR: /data
       MODEL_SIZE: small        # tiny | base | small | medium | large-v3
@@ -30,10 +31,11 @@ services:
         - internal-net
 
   worker:
-    build: ./worker
+    build: .
     container_name: transcribe-worker
     environment:
       TZ: Asia/Jakarta
+      ROLE: worker
       REDIS_URL: redis://:your-redis-password@redis:6379/0
       STORAGE_DIR: /data
       MODEL_SIZE: small
