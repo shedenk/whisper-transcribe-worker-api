@@ -105,33 +105,41 @@ async def job_status(job_id: str):
     job_id = safe_job_id(job_id)
     redis = get_redis()
     
-    # Retry 3 times with small delay to handle rare race conditions
     job = None
     for i in range(3):
         try:
             job = Job.fetch(job_id, connection=redis)
-            if job:
-                break
-        except Exception:
-            if i < 2:
-                import asyncio
-                await asyncio.sleep(0.5)
-                continue
+            if job: break
+        except:
+            import asyncio
+            if i < 2: await asyncio.sleep(0.5)
     
     if not job:
-        print(f"[!] Job {job_id} not found after retries")
         raise HTTPException(404, "job tidak ditemukan")
 
+    status = job.get_status()
+    pos = None
+    if status == "queued":
+        try:
+            q = get_queue()
+            pos = q.get_job_position(job_id) # Returns 0-indexed position
+        except: pass
+
     meta = job.meta or {}
+    
+    def fmt_time(dt):
+        return dt.isoformat() if dt else None
+
     return {
         "job_id": job.id,
-        "status": job.get_status(),
-        "created_at": str(job.created_at),
-        "enqueued_at": str(job.enqueued_at),
-        "started_at": str(job.started_at),
-        "ended_at": str(job.ended_at),
+        "status": status,
+        "queue_position": pos if pos is not None else (0 if status == "started" else None),
         "progress": meta.get("progress", 0),
         "message": meta.get("message"),
+        "created_at": fmt_time(job.created_at),
+        "enqueued_at": fmt_time(job.enqueued_at),
+        "started_at": fmt_time(job.started_at),
+        "ended_at": fmt_time(job.ended_at),
         "error": str(job.exc_info)[:500] if job.is_failed else None,
     }
 

@@ -82,21 +82,21 @@ def process_job(payload: Dict[str, Any]) -> Dict[str, Any]:
     base.mkdir(parents=True, exist_ok=True)
 
     wav_path = str(base / "audio.wav")
-    print(f"    - Converting to WAV...")
+    print(f"[{job_id}] Converting to WAV...")
     _to_wav(input_path, wav_path)
 
     job.meta["progress"] = 10
     job.meta["message"] = "loading model"
     job.save_meta()
 
-    print(f"    - Loading model ({MODEL_SIZE})...")
+    print(f"[{job_id}] Loading model ({MODEL_SIZE})...")
     model = _get_model()
 
     job.meta["progress"] = 15
     job.meta["message"] = "transcribing"
     job.save_meta()
 
-    print(f"    - Transcribing...")
+    print(f"[{job_id}] Transcribing...")
     segments_gen, info = model.transcribe(
         wav_path,
         language=language,
@@ -115,20 +115,20 @@ def process_job(payload: Dict[str, Any]) -> Dict[str, Any]:
         current_pos = segment.end
         if current_pos - last_log_time > 10: # Log every 10 seconds of audio processed
             percent = (current_pos / info.duration) * 100 if info.duration > 0 else 0
-            print(f"      > Processed: {current_pos:.1f}s / {info.duration:.1f}s ({percent:.1f}%)")
+            print(f"[{job_id}] Progress: {current_pos:.1f}s / {info.duration:.1f}s ({percent:.1f}%)")
             last_log_time = current_pos
             
             # Update job meta for API progress tracking
-            job.meta["progress"] = 15 + int(percent * 0.75) # 15% start + 75% of total
+            job.meta["progress"] = max(1, min(99, 15 + int(percent * 0.75)))
             job.save_meta()
 
-    print(f"    - Transcription finished. Total segments: {len(segments)}")
+    print(f"[{job_id}] Transcription finished. Total segments: {len(segments)}")
 
     job.meta["progress"] = 90
     job.meta["message"] = "writing output"
     job.save_meta()
 
-    print(f"    - Writing {output} output...")
+    print(f"[{job_id}] Writing {output} output...")
     if output == "srt":
         _write_srt(segments, base / "output.srt")
     elif output == "vtt":
