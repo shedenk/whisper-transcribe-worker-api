@@ -20,8 +20,7 @@ services:
       COMPUTE_TYPE: int8       # cpu: int8 / int8_float16; gpu: float16
       MAX_CONCURRENCY: "2"
       JOB_TTL_SECONDS: "86400"
-    ports:
-      - "8099:8099"
+      
     volumes:
       - transcribe-data:/data
     depends_on: [redis]
