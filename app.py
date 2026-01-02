@@ -11,6 +11,8 @@ from rq.job import Job
 from redis_queue import get_queue, get_redis
 from utils import storage_dir, safe_job_id
 
+app = FastAPI(title="Transcribe to SRT API")
+
 from pydantic import BaseModel
 
 class TranscribeRequest(BaseModel):
