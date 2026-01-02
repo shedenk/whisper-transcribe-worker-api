@@ -29,6 +29,7 @@ services:
 
     volumes:
       - transcribe-data:/data
+      - transcribe-cache:/root/.cache
     depends_on: 
     - redis
     restart: unless-stopped
@@ -51,6 +52,7 @@ services:
       JOB_TTL_SECONDS: "86400"
     volumes:
       - transcribe-data:/data
+      - transcribe-cache:/root/.cache
     depends_on: 
       - redis
     restart: unless-stopped
@@ -59,3 +61,4 @@ services:
 
 volumes:
   transcribe-data:
+  transcribe-cache:

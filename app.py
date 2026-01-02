@@ -10,6 +10,7 @@ import httpx
 from rq.job import Job
 from redis_queue import get_queue, get_redis
 from utils import storage_dir, safe_job_id
+import worker
 
 app = FastAPI(title="Transcribe to SRT API")
 
@@ -85,7 +86,7 @@ async def create_job(
     }
 
     q = get_queue()
-    rq_job = q.enqueue("worker.process_job", payload, job_id=job_uuid, result_ttl=int(os.getenv("JOB_TTL_SECONDS","86400")))
+    rq_job = q.enqueue(worker.process_job, payload, job_id=job_uuid, result_ttl=int(os.getenv("JOB_TTL_SECONDS","86400")))
     print(f"[+] Job enqueued: {job_uuid}")
     return {
         "job_id": rq_job.id,

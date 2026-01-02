@@ -32,7 +32,7 @@ def _to_wav(input_path: str, wav_path: str):
         "-vn",
         wav_path
     ]
-    subprocess.check_call(cmd)
+    subprocess.check_call(cmd, timeout=600)
 
 def _write_srt(segments, out_path: Path):
     subs = []
