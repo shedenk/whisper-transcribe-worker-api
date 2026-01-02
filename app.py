@@ -86,7 +86,13 @@ async def create_job(
     }
 
     q = get_queue()
-    rq_job = q.enqueue(worker.process_job, payload, job_id=job_uuid, result_ttl=int(os.getenv("JOB_TTL_SECONDS","86400")))
+    rq_job = q.enqueue(
+        worker.process_job,
+        payload,
+        job_id=job_uuid,
+        job_timeout=int(os.getenv("JOB_TIMEOUT", "3600")),
+        result_ttl=int(os.getenv("JOB_TTL_SECONDS", "86400"))
+    )
     print(f"[+] Job enqueued: {job_uuid}")
     return {
         "job_id": rq_job.id,
