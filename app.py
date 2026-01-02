@@ -101,12 +101,25 @@ async def create_job(
     }
 
 @app.get("/v1/jobs/{job_id}")
-def job_status(job_id: str):
+async def job_status(job_id: str):
     job_id = safe_job_id(job_id)
     redis = get_redis()
-    try:
-        job = Job.fetch(job_id, connection=redis)
-    except Exception:
+    
+    # Retry 3 times with small delay to handle rare race conditions
+    job = None
+    for i in range(3):
+        try:
+            job = Job.fetch(job_id, connection=redis)
+            if job:
+                break
+        except Exception:
+            if i < 2:
+                import asyncio
+                await asyncio.sleep(0.5)
+                continue
+    
+    if not job:
+        print(f"[!] Job {job_id} not found after retries")
         raise HTTPException(404, "job tidak ditemukan")
 
     meta = job.meta or {}
@@ -123,8 +136,26 @@ def job_status(job_id: str):
     }
 
 @app.get("/v1/jobs/{job_id}/result")
-def job_result(job_id: str):
+async def job_result(job_id: str):
     job_id = safe_job_id(job_id)
+    redis = get_redis()
+
+    # Retry to find job in case of slight delay
+    job = None
+    for i in range(3):
+        try:
+            job = Job.fetch(job_id, connection=redis)
+            if job:
+                break
+        except:
+            if i < 2:
+                import asyncio
+                await asyncio.sleep(0.5)
+                continue
+    
+    if not job:
+         raise HTTPException(404, "job tidak ditemukan")
+
     base = storage_dir() / "jobs" / job_id
 
     # worker akan tulis output di sini:

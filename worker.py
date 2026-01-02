@@ -97,7 +97,7 @@ def process_job(payload: Dict[str, Any]) -> Dict[str, Any]:
     job.save_meta()
 
     print(f"    - Transcribing...")
-    segments, info = model.transcribe(
+    segments_gen, info = model.transcribe(
         wav_path,
         language=language,
         task=task,
@@ -105,7 +105,24 @@ def process_job(payload: Dict[str, Any]) -> Dict[str, Any]:
         beam_size=1,
     )
     print(f"      [Detected language: {info.language}]")
-    segments = list(segments)
+    print(f"      [Audio duration: {info.duration:.2f}s]")
+
+    segments = []
+    last_log_time = 0
+    for segment in segments_gen:
+        segments.append(segment)
+        # Log progress every 5 seconds or every 50 segments
+        current_pos = segment.end
+        if current_pos - last_log_time > 10: # Log every 10 seconds of audio processed
+            percent = (current_pos / info.duration) * 100 if info.duration > 0 else 0
+            print(f"      > Processed: {current_pos:.1f}s / {info.duration:.1f}s ({percent:.1f}%)")
+            last_log_time = current_pos
+            
+            # Update job meta for API progress tracking
+            job.meta["progress"] = 15 + int(percent * 0.75) # 15% start + 75% of total
+            job.save_meta()
+
+    print(f"    - Transcription finished. Total segments: {len(segments)}")
 
     job.meta["progress"] = 90
     job.meta["message"] = "writing output"
@@ -132,7 +149,25 @@ def process_job(payload: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 if __name__ == "__main__":
-    redis_conn = get_redis()
-    q = Queue("transcribe", connection=redis_conn)
-    w = Worker([q], connection=redis_conn)
-    w.work()
+    import multiprocessing
+
+    print(f"[*] Worker manager starting (MAX_CONCURRENCY: {MAX_CONCURRENCY})...")
+    
+    def run_worker():
+        try:
+            redis_conn = get_redis()
+            q = Queue("transcribe", connection=redis_conn)
+            w = Worker([q], connection=redis_conn)
+            print(f"    [+] Worker process started, listening on: {q.name}")
+            w.work()
+        except Exception as e:
+            print(f"    [!] Worker process failed: {e}")
+
+    processes = []
+    for i in range(MAX_CONCURRENCY):
+        p = multiprocessing.Process(target=run_worker)
+        p.start()
+        processes.append(p)
+    
+    for p in processes:
+        p.join()
