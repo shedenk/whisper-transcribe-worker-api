@@ -6,8 +6,7 @@ from typing import Dict, Any, Optional
 from rq import Worker, Queue, Connection, get_current_job
 from faster_whisper import WhisperModel
 import srt
-
-from queue import get_redis
+from redis_queue import get_redis
 from utils import storage_dir
 
 MODEL_SIZE = os.getenv("MODEL_SIZE", "small")

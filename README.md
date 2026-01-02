@@ -73,8 +73,8 @@ curl -X POST http://localhost:8099/v1/transcribe \
 ```json
 {
   "job_id": "550e8400-e29b-41d4-a716-446655440000",
-  "status_url": f"/v1/jobs/550e8400-e29b-41d4-a716-446655440000",
-  "result_url": f"/v1/jobs/550e8400-e29b-41d4-a716-446655440000/result"
+  "status_url": "/v1/jobs/550e8400-e29b-41d4-a716-446655440000",
+  "result_url": "/v1/jobs/550e8400-e29b-41d4-a716-446655440000/result"
 }
 ```
 
@@ -120,3 +120,15 @@ Environment variables in `docker-compose.yaml`:
 
 - **FFmpeg**: Required for audio processing (included in Docker images).
 - **Shared Volume**: Ensure `transcribe-data` volume is correctly mapped for API/Worker interaction.
+
+## ❓ Troubleshooting
+
+### ImportError: cannot import name 'get_queue' from 'queue'
+This error occurs because of a naming conflict between the local `queue.py` and the Python standard library. The files have been renamed to `redis_queue.py` to resolve this.
+
+If you encounter this error, you must **rebuild** your Docker images to apply the fix:
+
+```bash
+docker-compose down
+docker-compose up -d --build
+```

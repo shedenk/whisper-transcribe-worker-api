@@ -5,6 +5,5 @@ from rq import Queue
 def get_redis():
     return Redis.from_url(os.environ["REDIS_URL"])
 
-def get_queue():
-    # queue name: transcribe
-    return Queue("transcribe", connection=get_redis())
+def get_queue(name="transcribe"):
+    return Queue(name, connection=get_redis())
