@@ -2,3 +2,4 @@ redis==5.2.1
 rq==2.0.0
 faster-whisper==1.1.0
 srt==3.5.3
+requests
