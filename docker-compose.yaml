@@ -4,7 +4,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: transcribe-redis
-    command: ["redis-server", "--appendonly", "no"]
+  command: ["redis-server", "--requirepass", "your-redis-password"]
     restart: unless-stopped
     networks: [internal-net]
 
@@ -13,14 +13,14 @@ services:
     container_name: transcribe-api
     environment:
       TZ: Asia/Jakarta
-      REDIS_URL: redis://redis:6379/0
+      REDIS_URL: redis://:your-redis-password@redis:6379/0
       STORAGE_DIR: /data
       MODEL_SIZE: small        # tiny | base | small | medium | large-v3
       DEVICE: cpu              # cpu | cuda (kalau ada GPU)
       COMPUTE_TYPE: int8       # cpu: int8 / int8_float16; gpu: float16
       MAX_CONCURRENCY: "2"
       JOB_TTL_SECONDS: "86400"
-      
+
     volumes:
       - transcribe-data:/data
     depends_on: [redis]
@@ -32,7 +32,7 @@ services:
     container_name: transcribe-worker
     environment:
       TZ: Asia/Jakarta
-      REDIS_URL: redis://redis:6379/0
+      REDIS_URL: redis://:your-redis-password@redis:6379/0
       STORAGE_DIR: /data
       MODEL_SIZE: small
       DEVICE: cpu
