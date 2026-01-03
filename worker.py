@@ -217,7 +217,8 @@ def process_job(payload: Dict[str, Any]) -> Dict[str, Any]:
         "language": info.language,
         "duration": info.duration,
         "output": output,
-        "minio_url": minio_url
+        "minio_url": minio_url,
+        "db_id": payload.get("db_id")
     }
 
     # Webhook Callback

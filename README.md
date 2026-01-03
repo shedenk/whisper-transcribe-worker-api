@@ -50,6 +50,7 @@ Submit a media URL or upload a file for transcription.
 | `task` | string | No | `transcribe` (default) or `translate` |
 | `output` | string | No | `srt` (default), `vtt`, or `txt` |
 | `callback_url` | string | No | URL to POST results to upon completion |
+| `db_id` | string | No | Custom ID for database tracking |
 
 **Example (URL):**
 ```bash
@@ -58,7 +59,8 @@ curl -X POST http://localhost:8080/v1/transcribe \
   -d '{
     "source_type": "url",
     "url": "https://example.com/audio.mp3",
-    "callback_url": "https://your-api.com/webhook"
+    "callback_url": "https://your-api.com/webhook",
+    "db_id": "job_12345"
   }'
 ```
 
@@ -74,7 +76,8 @@ When a job is finished, the worker will send a `POST` request to your `callback_
   "language": "id",
   "duration": 3631.2,
   "output": "srt",
-  "minio_url": "http://minio.example.com/transcribe/84829b12.../output.srt"
+  "minio_url": "http://minio.example.com/transcribe/84829b12.../output.srt",
+  "db_id": "job_12345"
 }
 ```
 

@@ -24,6 +24,7 @@ class TranscribeRequest(BaseModel):
     output: Literal["srt", "vtt", "txt"] = "srt"
     diarize: bool = False
     callback_url: Optional[str] = None
+    db_id: Optional[str] = None
 
 @app.post("/v1/transcribe")
 async def create_job(
@@ -50,7 +51,8 @@ async def create_job(
                 task=form.get("task", "transcribe"),
                 output=form.get("output", "srt"),
                 diarize=form.get("diarize", "false").lower() == "true",
-                callback_url=form.get("callback_url")
+                callback_url=form.get("callback_url"),
+                db_id=form.get("db_id")
             )
         except Exception as e:
             raise HTTPException(422, detail=f"Invalid Form Data: {str(e)}")
@@ -86,6 +88,7 @@ async def create_job(
         "output": params.output,
         "diarize": params.diarize,
         "callback_url": params.callback_url,
+        "db_id": params.db_id,
     }
 
     q = get_queue()
@@ -96,6 +99,8 @@ async def create_job(
         job_timeout=int(os.getenv("JOB_TIMEOUT", "14400")),
         result_ttl=int(os.getenv("JOB_TTL_SECONDS", "86400"))
     )
+    rq_job.meta['db_id'] = params.db_id
+    rq_job.save_meta()
     print(f"[+] Job enqueued: {job_uuid}")
     return {
         "job_id": rq_job.id,
@@ -146,6 +151,7 @@ async def job_status(job_id: str):
         "started_at": fmt_time(job.started_at),
         "ended_at": fmt_time(job.ended_at),
         "minio_url": meta.get("minio_url"),
+        "db_id": meta.get("db_id"),
         "error": str(job.exc_info)[:500] if job.is_failed else None,
     }
 
