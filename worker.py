@@ -255,7 +255,7 @@ if __name__ == "__main__":
                 connection=redis_conn, 
                 name=worker_name,
                 job_monitoring_interval=60,
-                default_worker_ttl=3600
+                worker_ttl=3600
             )
             # Ensure we give the worker enough time to heartbeat even under load
             print(f"    [+] Worker {worker_id} started, listening on: {q.name}")

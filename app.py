@@ -99,7 +99,7 @@ async def create_job(
         job_timeout=int(os.getenv("JOB_TIMEOUT", "14400")),
         result_ttl=int(os.getenv("JOB_TTL_SECONDS", "86400"))
     )
-    rq_job.meta['db_id'] = params.db_id
+    rq_job.meta["db_id"] = params.db_id
     rq_job.save_meta()
     print(f"[+] Job enqueued: {job_uuid}")
     return {
