@@ -21,12 +21,17 @@ services:
       PYTHONUNBUFFERED: "1"
       REDIS_URL: redis://:your-redis-password@redis:6379/0
       STORAGE_DIR: /data
-      MODEL_SIZE: small        # tiny | base | small | medium | large-v3
-      DEVICE: cpu              # cpu | cuda (kalau ada GPU)
-      COMPUTE_TYPE: int8       # cpu: int8 / int8_float16; gpu: float16
-      MAX_CONCURRENCY: "2"
+      MODEL_SIZE: "${MODEL_SIZE}"
+      DEVICE: cpu
+      COMPUTE_TYPE: int8
+      MAX_CONCURRENCY: "${MAX_CONCURRENCY}"
       JOB_TIMEOUT: "14400"
       JOB_TTL_SECONDS: "86400"
+      MINIO_ENDPOINT: "${MINIO_ENDPOINT}"
+      MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY}"
+      MINIO_SECRET_KEY: "${MINIO_SECRET_KEY}"
+      MINIO_BUCKET: "${MINIO_BUCKET}"
+      MINIO_SECURE: "${MINIO_SECURE}"
 
     volumes:
       - transcribe-data:/data
@@ -46,12 +51,18 @@ services:
       PYTHONUNBUFFERED: "1"
       REDIS_URL: redis://:your-redis-password@redis:6379/0
       STORAGE_DIR: /data
-      MODEL_SIZE: small
+      MODEL_SIZE: "${MODEL_SIZE}"
       DEVICE: cpu
       COMPUTE_TYPE: int8
-      MAX_CONCURRENCY: "2"     # worker CPU 6 core: mulai 1 dulu, naikkan jika aman
+      MAX_CONCURRENCY: "${MAX_CONCURRENCY}"
       JOB_TIMEOUT: "14400"
       JOB_TTL_SECONDS: "86400"
+      MINIO_ENDPOINT: "${MINIO_ENDPOINT}"
+      MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY}"
+      MINIO_SECRET_KEY: "${MINIO_SECRET_KEY}"
+      MINIO_BUCKET: "${MINIO_BUCKET}"
+      MINIO_SECURE: "${MINIO_SECURE}"
+      MINIO_PUBLIC_BASE_URL: "${MINIO_PUBLIC_BASE_URL}"
     volumes:
       - transcribe-data:/data
       - transcribe-cache:/root/.cache

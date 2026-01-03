@@ -23,6 +23,7 @@ class TranscribeRequest(BaseModel):
     task: Literal["transcribe", "translate"] = "transcribe"
     output: Literal["srt", "vtt", "txt"] = "srt"
     diarize: bool = False
+    callback_url: Optional[str] = None
 
 @app.post("/v1/transcribe")
 async def create_job(
@@ -48,7 +49,8 @@ async def create_job(
                 language=form.get("language"),
                 task=form.get("task", "transcribe"),
                 output=form.get("output", "srt"),
-                diarize=form.get("diarize", "false").lower() == "true"
+                diarize=form.get("diarize", "false").lower() == "true",
+                callback_url=form.get("callback_url")
             )
         except Exception as e:
             raise HTTPException(422, detail=f"Invalid Form Data: {str(e)}")
@@ -83,6 +85,7 @@ async def create_job(
         "task": params.task,
         "output": params.output,
         "diarize": params.diarize,
+        "callback_url": params.callback_url,
     }
 
     q = get_queue()
@@ -142,6 +145,7 @@ async def job_status(job_id: str):
         "enqueued_at": fmt_time(job.enqueued_at),
         "started_at": fmt_time(job.started_at),
         "ended_at": fmt_time(job.ended_at),
+        "minio_url": meta.get("minio_url"),
         "error": str(job.exc_info)[:500] if job.is_failed else None,
     }
 

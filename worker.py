@@ -7,12 +7,22 @@ from faster_whisper import WhisperModel
 import srt
 from redis_queue import get_redis
 from utils import storage_dir
+from minio import Minio
+from minio.error import S3Error
 
 MODEL_SIZE = os.getenv("MODEL_SIZE", "small")
 DEVICE = os.getenv("DEVICE", "cpu")
 COMPUTE_TYPE = os.getenv("COMPUTE_TYPE", "int8")
 MAX_CONCURRENCY = int(os.getenv("MAX_CONCURRENCY", "1"))
 CPU_THREADS = int(os.getenv("CPU_THREADS", "0"))
+
+# MinIO Config
+MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT")
+MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY")
+MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY")
+MINIO_BUCKET = os.getenv("MINIO_BUCKET", "transcribe")
+MINIO_SECURE = os.getenv("MINIO_SECURE", "false").lower() == "true"
+MINIO_PUBLIC_BASE_URL = os.getenv("MINIO_PUBLIC_BASE_URL")
 
 # cache model in memory (per worker process)
 _model: Optional[WhisperModel] = None
@@ -79,6 +89,36 @@ def _write_vtt(segments, out_path: Path):
     vtt = "WEBVTT\n\n" + re.sub(r"(\d{2}:\d{2}:\d{2}),(\d{3})", r"\1.\2", tmp)
     out_path.write_text(vtt, encoding="utf-8")
 
+def _upload_to_minio(file_path: Path, object_name: str) -> Optional[str]:
+    if not all([MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY]):
+        print("[!] MinIO configuration incomplete, skipping upload.")
+        return None
+    
+    try:
+        client = Minio(
+            MINIO_ENDPOINT,
+            access_key=MINIO_ACCESS_KEY,
+            secret_key=MINIO_SECRET_KEY,
+            secure=MINIO_SECURE
+        )
+        
+        if not client.bucket_exists(MINIO_BUCKET):
+            client.make_bucket(MINIO_BUCKET)
+            
+        client.fput_object(MINIO_BUCKET, object_name, str(file_path))
+        
+        # Construct URL
+        if MINIO_PUBLIC_BASE_URL:
+            # Ensure no trailing slash in base url and join with object name
+            base = MINIO_PUBLIC_BASE_URL.rstrip("/")
+            return f"{base}/{object_name}"
+            
+        protocol = "https" if MINIO_SECURE else "http"
+        return f"{protocol}://{MINIO_ENDPOINT}/{MINIO_BUCKET}/{object_name}"
+    except Exception as e:
+        print(f"[!] MinIO upload failed: {e}")
+        return None
+
 def process_job(payload: Dict[str, Any]) -> Dict[str, Any]:
     job = get_current_job()
     job.meta["progress"] = 1
@@ -143,24 +183,55 @@ def process_job(payload: Dict[str, Any]) -> Dict[str, Any]:
     job.save_meta()
 
     print(f"[{job_id}] Writing {output} output...")
+    out_file = None
     if output == "srt":
-        _write_srt(segments, base / "output.srt")
+        out_file = base / "output.srt"
+        _write_srt(segments, out_file)
     elif output == "vtt":
-        _write_vtt(segments, base / "output.vtt")
+        out_file = base / "output.vtt"
+        _write_vtt(segments, out_file)
     else:
-        _write_txt(segments, base / "output.txt")
+        out_file = base / "output.txt"
+        _write_txt(segments, out_file)
+
+    # Auto Upload to MinIO
+    minio_url = None
+    if out_file and out_file.exists():
+        job.meta["message"] = "uploading to minio"
+        job.save_meta()
+        print(f"[{job_id}] Uploading to MinIO...")
+        object_name = f"{job_id}/{out_file.name}"
+        minio_url = _upload_to_minio(out_file, object_name)
+        if minio_url:
+            job.meta["minio_url"] = minio_url
+            print(f"[{job_id}] Uploaded: {minio_url}")
 
     job.meta["progress"] = 100
     job.meta["message"] = "done"
     job.save_meta()
     print(f"[+] Job {job_id} completed successfully.")
 
-    return {
+    result = {
         "job_id": job_id,
+        "status": "finished",
         "language": info.language,
         "duration": info.duration,
-        "output": output
+        "output": output,
+        "minio_url": minio_url
     }
+
+    # Webhook Callback
+    callback_url = payload.get("callback_url")
+    if callback_url:
+        print(f"[{job_id}] Sending callback to: {callback_url}")
+        try:
+            import requests # locally to avoid global dependency issues
+            resp = requests.post(callback_url, json=result, timeout=30)
+            print(f"[{job_id}] Callback status: {resp.status_code}")
+        except Exception as e:
+            print(f"[{job_id}] Callback failed: {e}")
+
+    return result
 
 if __name__ == "__main__":
     import multiprocessing

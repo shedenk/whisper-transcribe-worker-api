@@ -1,6 +1,6 @@
 # Whisper Transcribe Worker API
 
-A high-performance transcription service using [Faster-Whisper](https://github.com/SYSTRAN/faster-whisper), FastAPI, and Redis Queue (RQ). Supports URL downloads, file uploads, and multiple output formats (SRT, VTT, TXT).
+A high-performance transcription service using [Faster-Whisper](https://github.com/SYSTRAN/faster-whisper), FastAPI, and Redis Queue (RQ). Supports URL downloads, file uploads, multiple output formats (SRT, VTT, TXT), MinIO auto-save, and Webhook callbacks.
 
 ## 🏗 Architecture
 
@@ -13,8 +13,9 @@ graph LR
     Worker -->|Read Input| Storage
     Worker -->|Process Transcription| Worker
     Worker -->|Write Output| Storage
+    Worker -->|Auto-save| MinIO[(MinIO)]
+    Worker -->|POST callback| Webhook[External System]
     Client -->|GET /v1/jobs/:id| API
-    Client -->|GET /v1/jobs/:id/result| API
 ```
 
 ## 🚀 Quick Start
@@ -30,11 +31,7 @@ cd whisper-transcribe-worker-api
 docker-compose up -d
 ```
 
-The API is available internally to other Docker containers.
-
-> [!IMPORTANT]
-> **INTERNAL ACCESS ONLY:**
-> Access the API at `http://transcribe-api:8080` from other containers in the same network (e.g., n8n). External access via `localhost` is disabled for security.
+The API will be available at `http://localhost:8080` (or your configured port).
 
 ## 📡 API Reference
 
@@ -43,72 +40,63 @@ The API is available internally to other Docker containers.
 
 Submit a media URL or upload a file for transcription.
 
-**Internal URL:** `http://transcribe-api:8080/v1/transcribe`
-
-**Request Body:**
-
+**Request Parameters:**
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `source_type` | string | Yes | `url` or `upload` |
 | `url` | string | Conditional | Required if `source_type` is `url` |
 | `file` | file | Conditional | Required if `source_type` is `upload` |
-| `language` | string | No | Language code (e.g., `id`, `en`). Auto-detect if omitted. |
-| `task` | string | No | `transcribe` (default) or `translate` (to English) |
+| `language` | string | No | Language code (e.g., `id`, `en`). |
+| `task` | string | No | `transcribe` (default) or `translate` |
 | `output` | string | No | `srt` (default), `vtt`, or `txt` |
+| `callback_url` | string | No | URL to POST results to upon completion |
 
-**Example (URL - JSON):**
+**Example (URL):**
 ```bash
-curl -X POST http://transcribe-api:8080/v1/transcribe \
+curl -X POST http://localhost:8080/v1/transcribe \
   -H "Content-Type: application/json" \
   -d '{
     "source_type": "url",
     "url": "https://example.com/audio.mp3",
-    "output": "srt"
+    "callback_url": "https://your-api.com/webhook"
   }'
 ```
 
-**Example (Upload - Form Data):**
-```bash
-curl -X POST http://transcribe-api:8080/v1/transcribe \
-  -F "source_type=upload" \
-  -F "file=@/path/to/audio.mp3" \
-  -F "output=srt"
-```
+---
 
-**Response:**
+### 2. Webhook Callback Body
+When a job is finished, the worker will send a `POST` request to your `callback_url` with the following JSON:
+
 ```json
 {
-  "job_id": "550e8400-e29b-41d4-a716-446655440000",
-  "status_url": "/v1/jobs/550e8400-e29b-41d4-a716-446655440000",
-  "result_url": "/v1/jobs/550e8400-e29b-41d4-a716-446655440000/result"
+  "job_id": "84829b12-6bc2-4bd0-8e21-6f33b52fc3b0",
+  "status": "finished",
+  "language": "id",
+  "duration": 3631.2,
+  "output": "srt",
+  "minio_url": "http://minio.example.com/transcribe/84829b12.../output.srt"
 }
 ```
 
-### 2. Check Job Status
+---
+
+### 3. Check Job Status
 `GET /v1/jobs/{job_id}`
 
-Track the progress of a transcription job.
+Track progress and get results.
 
 **Response:**
 ```json
 {
   "job_id": "...",
-  "status": "finished",
-  "progress": 100,
-  "message": "done",
-  "created_at": "...",
-  "started_at": "...",
-  "ended_at": "...",
+  "status": "started",
+  "progress": 45,
+  "queue_position": 0,
+  "minio_url": null,
+  "created_at": "2026-01-03T14:01:50.363Z",
   "error": null
 }
 ```
-
-### 3. Get Result
-`GET /v1/jobs/{job_id}/result`
-
-Download the generated transcription file (`.srt`, `.vtt`, or `.txt`).
-
----
 
 ## ⚙️ Configuration
 
@@ -116,26 +104,15 @@ Environment variables in `docker-compose.yaml`:
 
 | Variable | Default | Description |
 |---|---|---|
-| `ROLE` | `api` | Container role: `api` (starts FastAPI) or `worker` (starts RQ worker) |
 | `MODEL_SIZE` | `small` | Whisper model size (`tiny`, `base`, `small`, `medium`, `large-v3`) |
-| `DEVICE` | `cpu` | Processing device (`cpu` or `cuda`) |
-| `COMPUTE_TYPE` | `int8` | Quantization (`int8`, `float16`, etc.) |
-| `MAX_CONCURRENCY` | `1` | Max concurrent jobs per worker |
-| `JOB_TTL_SECONDS` | `86400` | How long job results are stored in Redis (seconds) |
+| `MAX_CONCURRENCY` | `2` | Max parallel jobs per worker container |
+| `JOB_TIMEOUT` | `14400` | Max processing time (4 hours) |
+| `MINIO_ENDPOINT` | | MinIO server address |
+| `MINIO_BUCKET` | `transcribe` | Destination bucket |
 
-## 🛠 Prerequisites
+## 🛠 Features
 
-- **FFmpeg**: Required for audio processing (included in Docker images).
-- **Shared Volume**: Ensure `transcribe-data` volume is correctly mapped for API/Worker interaction.
-
-## ❓ Troubleshooting
-
-### ImportError: cannot import name 'get_queue' from 'queue'
-This error occurs because of a naming conflict between the local `queue.py` and the Python standard library. The files have been renamed to `redis_queue.py` to resolve this.
-
-If you encounter this error, you must **rebuild** your Docker images to apply the fix:
-
-```bash
-docker-compose down
-docker-compose up -d --build
-```
+- **Parallel Processing**: Handles multiple jobs simultaneously using internal process management.
+- **Auto-Save**: Integrated with MinIO for persistent storage.
+- **Webhook**: Real-time notifications upon completion.
+- **Robust**: Automatic worker restart and increased heartbeat tolerance.
