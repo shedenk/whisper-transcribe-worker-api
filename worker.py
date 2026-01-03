@@ -12,6 +12,7 @@ MODEL_SIZE = os.getenv("MODEL_SIZE", "small")
 DEVICE = os.getenv("DEVICE", "cpu")
 COMPUTE_TYPE = os.getenv("COMPUTE_TYPE", "int8")
 MAX_CONCURRENCY = int(os.getenv("MAX_CONCURRENCY", "1"))
+CPU_THREADS = int(os.getenv("CPU_THREADS", "0"))
 
 # cache model in memory (per worker process)
 _model: Optional[WhisperModel] = None
@@ -19,7 +20,20 @@ _model: Optional[WhisperModel] = None
 def _get_model() -> WhisperModel:
     global _model
     if _model is None:
-        _model = WhisperModel(MODEL_SIZE, device=DEVICE, compute_type=COMPUTE_TYPE)
+        # If CPU threads not specified, we calculate it based on concurrency
+        # to avoid oversubscribing a 6-core machine (typical for user)
+        threads = CPU_THREADS
+        if threads == 0:
+            # Assume 6 cores as baseline if not specified
+            threads = max(1, 6 // MAX_CONCURRENCY)
+            
+        print(f"[*] Initializing WhisperModel ({MODEL_SIZE}) with {threads} threads")
+        _model = WhisperModel(
+            MODEL_SIZE, 
+            device=DEVICE, 
+            compute_type=COMPUTE_TYPE,
+            cpu_threads=threads
+        )
     return _model
 
 def _to_wav(input_path: str, wav_path: str):
@@ -150,24 +164,54 @@ def process_job(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 if __name__ == "__main__":
     import multiprocessing
+    import time
 
     print(f"[*] Worker manager starting (MAX_CONCURRENCY: {MAX_CONCURRENCY})...")
     
-    def run_worker():
+    def run_worker(worker_id):
+        # Increased heartbeat_ttl to 10 minutes (600s) to handle long transcription gaps
+        # Increased job_monitoring_interval to 60s
         try:
             redis_conn = get_redis()
             q = Queue("transcribe", connection=redis_conn)
-            w = Worker([q], connection=redis_conn)
-            print(f"    [+] Worker process started, listening on: {q.name}")
-            w.work()
+            
+            # Using a custom name to identify which slot the worker occupies
+            worker_name = f"worker-{os.uname().nodename}-{worker_id}"
+            
+            w = Worker(
+                [q], 
+                connection=redis_conn, 
+                name=worker_name,
+                job_monitoring_interval=60,
+                default_worker_ttl=3600
+            )
+            # Ensure we give the worker enough time to heartbeat even under load
+            print(f"    [+] Worker {worker_id} started, listening on: {q.name}")
+            w.work(logging_level="INFO")
         except Exception as e:
-            print(f"    [!] Worker process failed: {e}")
+            print(f"    [!] Worker {worker_id} failed: {e}")
 
-    processes = []
-    for i in range(MAX_CONCURRENCY):
-        p = multiprocessing.Process(target=run_worker)
+    processes = {}
+
+    def start_process(i):
+        p = multiprocessing.Process(target=run_worker, args=(i,), name=f"WorkerProcess-{i}")
         p.start()
-        processes.append(p)
+        processes[i] = p
+        return p
+
+    for i in range(MAX_CONCURRENCY):
+        start_process(i)
     
-    for p in processes:
-        p.join()
+    # Manager loop: check for dead processes and restart them
+    try:
+        while True:
+            for i, p in list(processes.items()):
+                if not p.is_alive():
+                    print(f"[!] Worker process {i} died. Restarting...")
+                    p.close()
+                    start_process(i)
+            time.sleep(10)
+    except KeyboardInterrupt:
+        print("[*] Manager shutting down...")
+        for p in processes.values():
+            p.terminate()
