@@ -7,6 +7,7 @@ from fastapi import FastAPI, UploadFile, File, Body, HTTPException, Request
 from fastapi.responses import FileResponse
 import httpx
 
+from rq import Worker
 from rq.job import Job
 from redis_queue import get_queue, get_redis
 from utils import storage_dir, safe_job_id
@@ -188,3 +189,15 @@ async def job_result(job_id: str):
             return FileResponse(str(p), media_type=media_type, filename=fname)
 
     raise HTTPException(404, "hasil belum ada / job belum selesai")
+
+@app.get("/v1/stats")
+async def get_stats():
+    q = get_queue()
+    redis = get_redis()
+    return {
+        "queued": q.count,
+        "started": q.started_job_registry.count,
+        "failed": q.failed_job_registry.count,
+        "finished": q.finished_job_registry.count,
+        "workers": len(Worker.all(connection=redis))
+    }

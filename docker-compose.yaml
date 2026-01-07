@@ -9,9 +9,9 @@ services:
     container_name: transcribe-redis
     command: ["redis-server", "--requirepass", "your-redis-password"]
     restart: unless-stopped
-    networks: 
-    - internal-net
-    
+    networks:
+      - internal-net
+
   transcribe-api:
     build: .
     container_name: transcribe-api
@@ -25,7 +25,7 @@ services:
       DEVICE: cpu
       COMPUTE_TYPE: int8
       MAX_CONCURRENCY: "${MAX_CONCURRENCY}"
-      JOB_TIMEOUT: "14400"
+      JOB_TIMEOUT: "${JOB_TIMEOUT}"
       JOB_TTL_SECONDS: "86400"
       MINIO_ENDPOINT: "${MINIO_ENDPOINT}"
       MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY}"
@@ -36,11 +36,11 @@ services:
     volumes:
       - transcribe-data:/data
       - transcribe-cache:/root/.cache
-    depends_on: 
-    - redis
+    depends_on:
+      - redis
     restart: unless-stopped
-    networks: 
-        - internal-net
+    networks:
+      - internal-net
 
   transcribe-worker:
     build: .
@@ -52,10 +52,12 @@ services:
       REDIS_URL: redis://:your-redis-password@redis:6379/0
       STORAGE_DIR: /data
       MODEL_SIZE: "${MODEL_SIZE}"
-      DEVICE: cpu
-      COMPUTE_TYPE: int8
+      WHISPER_DEVICE: "${WHISPER_DEVICE}"
+      WHISPER_COMPUTE_TYPE: "${WHISPER_COMPUTE_TYPE}"
       MAX_CONCURRENCY: "${MAX_CONCURRENCY}"
-      JOB_TIMEOUT: "14400"
+      JOB_TIMEOUT: "${JOB_TIMEOUT}"
+      FFMPEG_TIMEOUT: "${FFMPEG_TIMEOUT}"
+      WEBHOOK_ON_ERROR: "${WEBHOOK_ON_ERROR}"
       JOB_TTL_SECONDS: "86400"
       MINIO_ENDPOINT: "${MINIO_ENDPOINT}"
       MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY}"
@@ -66,11 +68,34 @@ services:
     volumes:
       - transcribe-data:/data
       - transcribe-cache:/root/.cache
-    depends_on: 
+    depends_on:
       - redis
     restart: unless-stopped
-    networks: 
-        - internal-net
+    networks:
+      - internal-net
+
+  cleanup:
+    image: alpine:3.19
+    container_name: whisper-cleanup
+    restart: unless-stopped
+    volumes:
+      - ./cleanup.sh:/app/cleanup.sh
+      - ./.env:/app/.env
+      # Menggunakan volume yang sama dengan worker (transcribe-data)
+      - transcribe-data:/data
+    working_dir: /app
+    command: >
+      /bin/sh -c "
+      apk add --no-cache bash &&
+      chmod +x cleanup.sh &&
+      echo 'Starting Cleanup Scheduler...' &&
+      while true; do
+        ./cleanup.sh;
+        echo 'Next cleanup run in 60 minutes...';
+        sleep 3600;
+      done"
+    networks:
+      - internal-net
 
 volumes:
   transcribe-data:

@@ -9,12 +9,16 @@ from redis_queue import get_redis
 from utils import storage_dir
 from minio import Minio
 from minio.error import S3Error
+import requests
+import traceback
 
 MODEL_SIZE = os.getenv("MODEL_SIZE", "small")
-DEVICE = os.getenv("DEVICE", "cpu")
-COMPUTE_TYPE = os.getenv("COMPUTE_TYPE", "int8")
+DEVICE = os.getenv("WHISPER_DEVICE", "auto")
+COMPUTE_TYPE = os.getenv("WHISPER_COMPUTE_TYPE", "default")
 MAX_CONCURRENCY = int(os.getenv("MAX_CONCURRENCY", "1"))
 CPU_THREADS = int(os.getenv("CPU_THREADS", "0"))
+FFMPEG_TIMEOUT = int(os.getenv("FFMPEG_TIMEOUT", "300"))
+WEBHOOK_ON_ERROR = os.getenv("WEBHOOK_ON_ERROR", "true").lower() == "true"
 
 # MinIO Config
 MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT")
@@ -56,7 +60,7 @@ def _to_wav(input_path: str, wav_path: str):
         "-vn",
         wav_path
     ]
-    subprocess.check_call(cmd, timeout=600)
+    subprocess.check_call(cmd, timeout=FFMPEG_TIMEOUT)
 
 def _write_srt(segments, out_path: Path):
     subs = []
@@ -119,7 +123,35 @@ def _upload_to_minio(file_path: Path, object_name: str) -> Optional[str]:
         print(f"[!] MinIO upload failed: {e}")
         return None
 
+def _send_webhook(url: str, data: Dict[str, Any]):
+    """Helper untuk mengirim webhook dengan aman"""
+    print(f"    -> Sending webhook to: {url}")
+    try:
+        resp = requests.post(url, json=data, timeout=10)
+        print(f"    -> Webhook status: {resp.status_code}")
+    except Exception as e:
+        print(f"    [!] Webhook failed: {e}")
+
 def process_job(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Wrapper untuk menangani error dan mengirim webhook kegagalan"""
+    try:
+        return _execute_job_logic(payload)
+    except Exception as e:
+        job_id = payload.get("job_id", "unknown")
+        callback_url = payload.get("callback_url")
+        print(f"[{job_id}] CRITICAL ERROR: {str(e)}")
+        
+        if WEBHOOK_ON_ERROR and callback_url:
+            error_payload = {
+                "job_id": job_id,
+                "status": "failed",
+                "error": str(e),
+                "db_id": payload.get("db_id")
+            }
+            _send_webhook(callback_url, error_payload)
+        raise e  # Re-raise agar RQ mencatat job sebagai failed
+
+def _execute_job_logic(payload: Dict[str, Any]) -> Dict[str, Any]:
     job = get_current_job()
     job.meta["progress"] = 1
     job.meta["message"] = "preparing"
@@ -224,13 +256,7 @@ def process_job(payload: Dict[str, Any]) -> Dict[str, Any]:
     # Webhook Callback
     callback_url = payload.get("callback_url")
     if callback_url:
-        print(f"[{job_id}] Sending callback to: {callback_url}")
-        try:
-            import requests # locally to avoid global dependency issues
-            resp = requests.post(callback_url, json=result, timeout=30)
-            print(f"[{job_id}] Callback status: {resp.status_code}")
-        except Exception as e:
-            print(f"[{job_id}] Callback failed: {e}")
+        _send_webhook(callback_url, result)
 
     return result
 

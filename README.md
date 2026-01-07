@@ -1,121 +1,113 @@
 # Whisper Transcribe Worker API
 
-A high-performance transcription service using [Faster-Whisper](https://github.com/SYSTRAN/faster-whisper), FastAPI, and Redis Queue (RQ). Supports URL downloads, file uploads, multiple output formats (SRT, VTT, TXT), MinIO auto-save, and Webhook callbacks.
+API berbasis FastAPI dan Redis Queue (RQ) untuk melakukan transkripsi audio/video menggunakan model [Faster-Whisper](https://github.com/SYSTRAN/faster-whisper). Sistem ini dirancang untuk menangani antrian pekerjaan (jobs) secara asinkron, stabil, dan dapat diskalakan.
 
-## 🏗 Architecture
+## Fitur Utama
 
-```mermaid
-graph LR
-    Client -->|POST /v1/transcribe| API[FastAPI]
-    API -->|Save Input| Storage[(Shared Storage)]
-    API -->|Enqueue Job| Redis((Redis))
-    Redis -->|Dequeue| Worker[Faster-Whisper Worker]
-    Worker -->|Read Input| Storage
-    Worker -->|Process Transcription| Worker
-    Worker -->|Write Output| Storage
-    Worker -->|Auto-save| MinIO[(MinIO)]
-    Worker -->|POST callback| Webhook[External System]
-    Client -->|GET /v1/jobs/:id| API
-```
+- **Faster-Whisper**: Implementasi Whisper yang jauh lebih cepat dan hemat memori dibanding versi original OpenAI.
+- **Asynchronous Processing**: Menggunakan Redis Queue untuk manajemen antrian job.
+- **Robust Error Handling**: Dilengkapi mekanisme timeout untuk FFmpeg dan proses transkripsi agar worker tidak _stuck_.
+- **Auto-Cleanup**: Container _sidecar_ khusus yang otomatis membersihkan file temporary dari job yang crash/tertinggal.
+- **Webhook Notifications**: Mengirim notifikasi ke URL callback saat job selesai atau gagal.
+- **MinIO Integration**: Upload otomatis hasil transkripsi ke S3-compatible storage.
+- **Monitoring**: Endpoint statistik real-time untuk memantau antrian.
 
-## 🚀 Quick Start
+## Persyaratan
 
-Ensure you have Docker and Docker Compose installed.
+- Docker & Docker Compose
+- NVIDIA Driver & NVIDIA Container Toolkit (Wajib jika ingin menggunakan akselerasi GPU)
 
-```bash
-# Clone the repository
-git clone https://github.com/your-repo/whisper-transcribe-worker-api.git
-cd whisper-transcribe-worker-api
+## Instalasi & Konfigurasi
 
-# Start the services
-docker-compose up -d
-```
+1.  **Clone Repository**
 
-The API will be available at `http://localhost:8080` (or your configured port).
+    ```bash
+    git clone <repository_url>
+    cd whisper-transcribe-worker-api
+    ```
 
-## 📡 API Reference
+2.  **Konfigurasi Environment**
+    Buat file `.env` (bisa dicopy dari contoh jika ada) dan sesuaikan variabel berikut:
 
-### 1. Create Transcription Job
-`POST /v1/transcribe`
+    ```dotenv
+    # Konfigurasi Worker
+    MODEL_SIZE=small              # tiny, base, small, medium, large-v2
+    MAX_CONCURRENCY=2             # Jumlah job paralel per container
+    WHISPER_DEVICE=auto           # 'cuda' untuk GPU, 'cpu' untuk CPU
+    WHISPER_COMPUTE_TYPE=default  # 'float16' (GPU) atau 'int8' (CPU)
 
-Submit a media URL or upload a file for transcription.
+    # Safety & Timeout (Mencegah Stuck)
+    JOB_TIMEOUT=1800              # Batas waktu total job (detik), default 30 menit
+    FFMPEG_TIMEOUT=300            # Batas waktu konversi audio (detik), default 5 menit
+    WEBHOOK_ON_ERROR=true         # Kirim webhook jika job gagal
 
-**Request Parameters:**
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `source_type` | string | Yes | `url` or `upload` |
-| `url` | string | Conditional | Required if `source_type` is `url` |
-| `file` | file | Conditional | Required if `source_type` is `upload` |
-| `language` | string | No | Language code (e.g., `id`, `en`). |
-| `task` | string | No | `transcribe` (default) or `translate` |
-| `output` | string | No | `srt` (default), `vtt`, or `txt` |
-| `callback_url` | string | No | URL to POST results to upon completion |
-| `db_id` | string | No | Custom ID for database tracking |
+    # Storage (MinIO / S3)
+    MINIO_ENDPOINT=minio:9000
+    MINIO_ACCESS_KEY=your_access_key
+    MINIO_SECRET_KEY=your_secret_key
+    MINIO_BUCKET=transcribe
+    ```
 
-**Example (URL):**
-```bash
-curl -X POST http://localhost:8080/v1/transcribe \
-  -H "Content-Type: application/json" \
-  -d '{
-    "source_type": "url",
-    "url": "https://example.com/audio.mp3",
-    "callback_url": "https://your-api.com/webhook",
-    "db_id": "job_12345"
-  }'
-```
+3.  **Jalankan Aplikasi**
+    ```bash
+    docker-compose up -d --build
+    ```
+    Perintah ini akan menjalankan 4 service: `redis`, `transcribe-api`, `transcribe-worker`, dan `cleanup`.
 
----
+## Penggunaan API
 
-### 2. Webhook Callback Body
-When a job is finished, the worker will send a `POST` request to your `callback_url` with the following JSON:
+### 1. Submit Job Transkripsi
+
+**POST** `/v1/transcribe`
+
+Mendukung input berupa URL file audio atau Upload file langsung.
+
+**Contoh Body (JSON):**
 
 ```json
 {
-  "job_id": "84829b12-6bc2-4bd0-8e21-6f33b52fc3b0",
-  "status": "finished",
+  "source_type": "url",
+  "url": "https://example.com/audio_podcast.mp3",
   "language": "id",
-  "duration": 3631.2,
+  "task": "transcribe",
   "output": "srt",
-  "minio_url": "http://minio.example.com/transcribe/84829b12.../output.srt",
-  "db_id": "job_12345"
+  "callback_url": "https://api.domainkamu.com/webhook/result"
 }
 ```
 
----
+### 2. Cek Status Job
 
-### 3. Check Job Status
-`GET /v1/jobs/{job_id}`
+**POST** `/v1/jobs/{job_id}`
 
-Track progress and get results.
+Mengembalikan status job (`queued`, `started`, `finished`, `failed`) dan persentase progress.
 
-**Response:**
+### 3. Download Hasil
+
+**GET** `/v1/jobs/{job_id}/result`
+
+Mengunduh file output (`.srt`, `.vtt`, atau `.txt`) jika job sudah selesai.
+
+### 4. Monitoring Statistik (Baru)
+
+**GET** `/v1/stats`
+
+Melihat kesehatan sistem antrian.
+
 ```json
 {
-  "job_id": "...",
-  "status": "started",
-  "progress": 45,
-  "queue_position": 0,
-  "minio_url": null,
-  "created_at": "2026-01-03T14:01:50.363Z",
-  "error": null
+  "queued": 5,
+  "started": 2,
+  "failed": 0,
+  "finished": 120,
+  "workers": 2
 }
 ```
 
-## ⚙️ Configuration
+## Mekanisme Maintenance (Auto-Cleanup)
 
-Environment variables in `docker-compose.yaml`:
+Sistem ini menyertakan service `cleanup` yang berjalan di background.
 
-| Variable | Default | Description |
-|---|---|---|
-| `MODEL_SIZE` | `small` | Whisper model size (`tiny`, `base`, `small`, `medium`, `large-v3`) |
-| `MAX_CONCURRENCY` | `2` | Max parallel jobs per worker container |
-| `JOB_TIMEOUT` | `14400` | Max processing time (4 hours) |
-| `MINIO_ENDPOINT` | | MinIO server address |
-| `MINIO_BUCKET` | `transcribe` | Destination bucket |
-
-## 🛠 Features
-
-- **Parallel Processing**: Handles multiple jobs simultaneously using internal process management.
-- **Auto-Save**: Integrated with MinIO for persistent storage.
-- **Webhook**: Real-time notifications upon completion.
-- **Robust**: Automatic worker restart and increased heartbeat tolerance.
+- **Fungsi**: Memindai folder temporary jobs setiap jam.
+- **Aturan**: Menghapus folder job yang usianya lebih dari **60 menit**.
+- **Tujuan**: Mencegah disk penuh akibat file sampah dari job yang mungkin crash atau dihentikan paksa.
+- **Script**: Logika pembersihan ada di file `cleanup.sh`.
