@@ -12,6 +12,12 @@ def valid_int_env(key: str, default: int) -> int:
     except ValueError:
         return default
 
+def valid_str_env(key: str, default: str) -> str:
+    val = os.environ.get(key, default)
+    if not val or not val.strip():
+        return default
+    return val
+
 def storage_dir() -> Path:
     p = Path(os.environ.get("STORAGE_DIR", "/data"))
     p.mkdir(parents=True, exist_ok=True)

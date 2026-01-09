@@ -111,3 +111,30 @@ Sistem ini menyertakan service `cleanup` yang berjalan di background.
 - **Aturan**: Menghapus folder job yang usianya lebih dari **60 menit**.
 - **Tujuan**: Mencegah disk penuh akibat file sampah dari job yang mungkin crash atau dihentikan paksa.
 - **Script**: Logika pembersihan ada di file `cleanup.sh`.
+
+## Webhook Callback
+
+If a `callback_url` is provided in the request, the worker will send a POST request to that URL upon job completion or failure.
+
+### Success Payload
+```json
+{
+  "job_id": "90ba2c64-9bab-45f8-b622-7276a68275ab",
+  "status": "finished",
+  "language": "en",
+  "duration": 120.5,
+  "output": "srt",
+  "minio_url": "https://storage.example.com/transcribe/90ba2c64-9bab-45f8-b622-7276a68275ab/output.srt",
+  "db_id": "optional_db_id"
+}
+```
+
+### Failure Payload
+```json
+{
+  "job_id": "90ba2c64-9bab-45f8-b622-7276a68275ab",
+  "status": "failed",
+  "error": "Error description here",
+  "db_id": "optional_db_id"
+}
+```

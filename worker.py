@@ -6,14 +6,15 @@ from rq import Worker, Queue, get_current_job
 from faster_whisper import WhisperModel
 import srt
 from redis_queue import get_redis
-from utils import storage_dir, valid_int_env
+from utils import storage_dir, valid_int_env, valid_str_env
 from minio import Minio
 from minio.error import S3Error
 import requests
 
-MODEL_SIZE = os.getenv("MODEL_SIZE", "small")
-DEVICE = os.getenv("WHISPER_DEVICE", "auto")
-COMPUTE_TYPE = os.getenv("WHISPER_COMPUTE_TYPE", "default")
+
+MODEL_SIZE = valid_str_env("MODEL_SIZE", "small")
+DEVICE = valid_str_env("WHISPER_DEVICE", "auto")
+COMPUTE_TYPE = valid_str_env("WHISPER_COMPUTE_TYPE", "default")
 MAX_CONCURRENCY = valid_int_env("MAX_CONCURRENCY", 1)
 CPU_THREADS = valid_int_env("CPU_THREADS", 0)
 FFMPEG_TIMEOUT = valid_int_env("FFMPEG_TIMEOUT", 300)
@@ -23,7 +24,7 @@ WEBHOOK_ON_ERROR = os.getenv("WEBHOOK_ON_ERROR", "true").lower() == "true"
 MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT")
 MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY")
 MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY")
-MINIO_BUCKET = os.getenv("MINIO_BUCKET", "transcribe")
+MINIO_BUCKET = valid_str_env("MINIO_BUCKET", "transcribe")
 MINIO_SECURE = os.getenv("MINIO_SECURE", "false").lower() == "true"
 MINIO_PUBLIC_BASE_URL = os.getenv("MINIO_PUBLIC_BASE_URL")
 
