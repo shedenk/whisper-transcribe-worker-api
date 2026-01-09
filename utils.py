@@ -2,6 +2,16 @@ import os
 import re
 from pathlib import Path
 
+
+def valid_int_env(key: str, default: int) -> int:
+    val = os.environ.get(key, str(default))
+    if not val or not val.strip():
+        return default
+    try:
+        return int(val)
+    except ValueError:
+        return default
+
 def storage_dir() -> Path:
     p = Path(os.environ.get("STORAGE_DIR", "/data"))
     p.mkdir(parents=True, exist_ok=True)

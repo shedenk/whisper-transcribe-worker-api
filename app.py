@@ -10,7 +10,7 @@ import httpx
 from rq import Worker
 from rq.job import Job
 from redis_queue import get_queue, get_redis
-from utils import storage_dir, safe_job_id
+from utils import storage_dir, safe_job_id, valid_int_env
 import worker
 
 app = FastAPI(title="Transcribe to SRT API")
@@ -97,8 +97,8 @@ async def create_job(
         worker.process_job,
         payload,
         job_id=job_uuid,
-        job_timeout=int(os.getenv("JOB_TIMEOUT", "14400")),
-        result_ttl=int(os.getenv("JOB_TTL_SECONDS", "86400"))
+        job_timeout=valid_int_env("JOB_TIMEOUT", 14400),
+        result_ttl=valid_int_env("JOB_TTL_SECONDS", 86400)
     )
     rq_job.meta["db_id"] = params.db_id
     rq_job.save_meta()

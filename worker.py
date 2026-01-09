@@ -6,20 +6,10 @@ from rq import Worker, Queue, get_current_job
 from faster_whisper import WhisperModel
 import srt
 from redis_queue import get_redis
-from utils import storage_dir
+from utils import storage_dir, valid_int_env
 from minio import Minio
 from minio.error import S3Error
 import requests
-import traceback
-
-def valid_int_env(key: str, default: int) -> int:
-    val = os.getenv(key, str(default))
-    if not val or not val.strip():
-        return default
-    try:
-        return int(val)
-    except ValueError:
-        return default
 
 MODEL_SIZE = os.getenv("MODEL_SIZE", "small")
 DEVICE = os.getenv("WHISPER_DEVICE", "auto")
