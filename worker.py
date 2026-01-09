@@ -12,12 +12,21 @@ from minio.error import S3Error
 import requests
 import traceback
 
+def valid_int_env(key: str, default: int) -> int:
+    val = os.getenv(key, str(default))
+    if not val or not val.strip():
+        return default
+    try:
+        return int(val)
+    except ValueError:
+        return default
+
 MODEL_SIZE = os.getenv("MODEL_SIZE", "small")
 DEVICE = os.getenv("WHISPER_DEVICE", "auto")
 COMPUTE_TYPE = os.getenv("WHISPER_COMPUTE_TYPE", "default")
-MAX_CONCURRENCY = int(os.getenv("MAX_CONCURRENCY", "1"))
-CPU_THREADS = int(os.getenv("CPU_THREADS", "0"))
-FFMPEG_TIMEOUT = int(os.getenv("FFMPEG_TIMEOUT", "300"))
+MAX_CONCURRENCY = valid_int_env("MAX_CONCURRENCY", 1)
+CPU_THREADS = valid_int_env("CPU_THREADS", 0)
+FFMPEG_TIMEOUT = valid_int_env("FFMPEG_TIMEOUT", 300)
 WEBHOOK_ON_ERROR = os.getenv("WEBHOOK_ON_ERROR", "true").lower() == "true"
 
 # MinIO Config
