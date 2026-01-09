@@ -13,7 +13,7 @@ COPY . .
 EXPOSE 8080
 
 CMD ["bash", "-c", "\
-rm -rf /data/downloads/* 2>/dev/null; \
+rm -rf /data/downloads/* /data/jobs/* 2>/dev/null; \
 if [ \"$ROLE\" = \"worker\" ]; then \
   echo 'Starting TRANSCRIBE WORKER'; \
   python /app/worker.py; \
