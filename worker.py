@@ -126,6 +126,7 @@ def _upload_to_minio(file_path: Path, object_name: str) -> Optional[str]:
 def _send_webhook(url: str, data: Dict[str, Any]):
     """Helper untuk mengirim webhook dengan aman"""
     print(f"    -> Sending webhook to: {url}")
+    print(f"    -> Webhook payload: {data}")
     try:
         resp = requests.post(url, json=data, timeout=10)
         print(f"    -> Webhook status: {resp.status_code}")
