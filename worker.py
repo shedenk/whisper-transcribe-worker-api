@@ -15,6 +15,10 @@ import requests
 MODEL_SIZE = valid_str_env("MODEL_SIZE", "small")
 DEVICE = valid_str_env("WHISPER_DEVICE", "auto")
 COMPUTE_TYPE = valid_str_env("WHISPER_COMPUTE_TYPE", "default")
+# Optimize for CPU
+if DEVICE == "cpu" and COMPUTE_TYPE == "default":
+    COMPUTE_TYPE = "int8"
+
 MAX_CONCURRENCY = valid_int_env("MAX_CONCURRENCY", 1)
 CPU_THREADS = valid_int_env("CPU_THREADS", 0)
 FFMPEG_TIMEOUT = valid_int_env("FFMPEG_TIMEOUT", 300)
