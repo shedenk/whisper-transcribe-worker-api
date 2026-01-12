@@ -18,6 +18,17 @@ def valid_str_env(key: str, default: str) -> str:
         return default
     return val
 
+def sanitize_minio_endpoint(endpoint: str) -> str:
+    """Removes protocol (http/https) and path from endpoint string."""
+    if not endpoint:
+        return ""
+    # Remove protocol
+    if "://" in endpoint:
+        endpoint = endpoint.split("://")[-1]
+    # Remove path
+    endpoint = endpoint.split("/")[0]
+    return endpoint
+
 def storage_dir() -> Path:
     p = Path(os.environ.get("STORAGE_DIR", "/data"))
     p.mkdir(parents=True, exist_ok=True)

@@ -6,7 +6,7 @@ from rq import Worker, Queue, get_current_job
 from faster_whisper import WhisperModel
 import srt
 from redis_queue import get_redis
-from utils import storage_dir, valid_int_env, valid_str_env
+from utils import storage_dir, valid_int_env, valid_str_env, sanitize_minio_endpoint
 from minio import Minio
 from minio.error import S3Error
 import requests
@@ -25,7 +25,7 @@ FFMPEG_TIMEOUT = valid_int_env("FFMPEG_TIMEOUT", 300)
 WEBHOOK_ON_ERROR = os.getenv("WEBHOOK_ON_ERROR", "true").lower() == "true"
 
 # MinIO Config
-MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT")
+MINIO_ENDPOINT = sanitize_minio_endpoint(os.getenv("MINIO_ENDPOINT", ""))
 MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY")
 MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY")
 MINIO_BUCKET = valid_str_env("MINIO_BUCKET", "transcribe")
