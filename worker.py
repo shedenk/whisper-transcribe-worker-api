@@ -237,7 +237,7 @@ def _execute_job_logic(payload: Dict[str, Any]) -> Dict[str, Any]:
         job.meta["message"] = "uploading to minio"
         job.save_meta()
         print(f"[{job_id}] Uploading to MinIO...")
-        object_name = f"{job_id}/{out_file.name}"
+        object_name = f"{job_id}{out_file.suffix}"
         minio_url = _upload_to_minio(out_file, object_name)
         if minio_url:
             job.meta["minio_url"] = minio_url
